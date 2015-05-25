@@ -1,201 +1,167 @@
-/**
- * This file provided by Facebook is for non-commercial testing and evaluation purposes only.
- * Facebook reserves all rights not expressly granted.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+var gParams = {
+  method: "GET",
+  url: "/contacts"
+};
 
-var Request = React.createClass({
+var ParameterForm = React.createClass({
+  DeleteMe: function(e) {
+    e.preventDefault();
+    this.props.data.delete();
+    this.props.parentChangeState();
+  },
+  handleKeyChange: function(event) {
+    this.props.data.key = event.target.value;
+    this.forceUpdate();
+  },
+  handleValueChange: function(event) {
+    this.props.data.value = event.target.value;
+    this.forceUpdate();
+  },
   render: function() {
-    var rawMarkup = marked(this.props.children.toString(), {sanitize: true});
     return (
-      <div className="comment">
-        <h2 className="commentAuthor">
-          {this.props.author}
-        </h2>
-        <span dangerouslySetInnerHTML={{__html: rawMarkup}} />
+      <div className="row">
+        <div className="col-xs-3">
+          <input type="text" placeholder="Key" className="form-control"
+            value={this.props.data.key} onChange={this.handleKeyChange} />
+        </div>
+        <div className="col-xs-8">
+          <input type="text" placeholder="Value" className="form-control col-xs-8"
+            value={this.props.data.value} onChange={this.handleValueChange} />
+        </div>
+        <button className="btn btn-default"
+          onClick={this.DeleteMe}><i className="glyphicon glyphicon-remove"></i></button>
       </div>
     );
   }
 });
 
-var RequestForm = React.createClass({
-  handleSubmit: function(e) {
-    e.preventDefault();
-    var author = React.findDOMNode(this.refs.requestData).value.trim();
-    var text = React.findDOMNode(this.refs.text).value.trim();
-    if (!text || !author) {
-      return;
-    }
-    this.props.onCommentSubmit({author: author, text: text});
-    React.findDOMNode(this.refs.author).value = '';
-    React.findDOMNode(this.refs.text).value = '';
+var RestRequestHeaderBox = React.createClass({
+  getInitialState: function() {
+    return {
+      method: gParams.method,
+      url: gParams.url
+    };
+  },
+  changeMethod: function (event) {
+    gParams.method = event.target.value;
+    this.setState({
+      method: event.target.value
+    });
+  },
+  changeUrl: function (event) {
+    gParams.url = event.target.value;
+    this.setState({
+      url: event.target.value
+    });
   },
   render: function() {
     return (
-      <form className="commentForm" onSubmit={this.handleSubmit}>
-        <input type="text" placeholder="Your name" ref="requestData" />
-        <input type="submit" value="Post" />
-      </form>
-    );
-  }
-});
-
-var RestRequestHeaderBox = React.createClass({
-  render: function() {
-    return (
       <section>
-        <h4>Method</h4>
-        <select>
-          <option>GET</option>
-          <option>POST</option>
-          <option>PUT</option>
-          <option>DELETE</option>
-        </select>
-        <h4>Endpoint</h4>
-        <input type="text" ref="endpoint" />
+        <div className="form-horizontal">
+          <div className="form-group">
+            <label htmlFor="restMethod" className="col-sm-2 control-label">Method</label>
+            <div className="col-sm-10">
+              <select id="restMethod" className="form-control" ref="method"
+                value={this.state.method} onChange={this.changeMethod}>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div className="form-horizontal">
+          <div className="form-group">
+            <label htmlFor="restEndpoint" className="col-sm-2 control-label">Endpoint</label>
+            <div className="col-sm-10">
+              <input type="text" id="restEndpoint" className="form-control" ref="endpoint"
+                value={this.state.url} onChange={this.changeUrl} />
+            </div>
+          </div>
+        </div>
       </section>
     );
   }
 });
 
-var RestRequestListBox = React.createClass({
+var RestParameterListBox = React.createClass({
+  getInitialState: function() {
+    return {data: ParamModelManager.get()};
+  },
+  changeState: function (data) {
+    this.setState({data: ParamModelManager.get()});
+  },
+  AddOne: function(e) {
+    e.preventDefault();
+    ParamModelManager.addParam({key: '', value: ''});
+    render();
+  },
   render: function() {
-    var requestNodes = this.props.data.map(function(comment, index) {
+    var requestNodes = this.state.data.map(function(parameter, index) {
       return (
-        // `key` is a React-specific concept and is not mandatory for the
-        // purpose of this tutorial. if you're curious, see more here:
-        // http://facebook.github.io/react/docs/multiple-components.html#dynamic-children
-        <Comment author={comment.author} key={index}>
-          {comment.text}
-        </Comment>
+        <ParameterForm data={parameter} key={index} parentChangeState={this.changeState}>
+        </ParameterForm>
       );
-    });
+    }.bind(this));
     return (
-      <div className="commentList">
+      <div className="parameterList well">
+        <button className="btn btn-primary" onClick={this.AddOne}>Add new value</button>
         {requestNodes}
       </div>
     );
   }
 });
 
-var Comment = React.createClass({
-  render: function() {
-    var rawMarkup = marked(this.props.children.toString(), {sanitize: true});
+var RestRequestResultBox = React.createClass({
+  getInitialState: function() {
+    return {result: '{}'};
+  },
+  sendRequest: function () {
+    RestService.fire(gParams.url, gParams.method, ParamModelManager.json(),
+      function(data) {
+        console.log('--- SUCCESS: ', data);
+        this.setState({result: JSON.toString(data)});
+      }.bind(this),
+      function (xhr, status, err) {
+        console.log('--- ERROR: ', xhr, status, err);
+        this.setState({result: '{}'});
+      }.bind(this)
+    );
+  },
+  render: function () {
     return (
-      <div className="comment">
-        <h2 className="commentAuthor">
-          {this.props.author}
-        </h2>
-        <span dangerouslySetInnerHTML={{__html: rawMarkup}} />
+      <div>
+        <div>
+          <button className="btn btn-danger" onClick={this.sendRequest}>Send</button>
+        </div>
+        <h4> Result : </h4>
+        <div className="well">
+        {this.result}
+        </div>
       </div>
     );
   }
 });
 
-var CommentBox = React.createClass({
-  loadCommentsFromServer: function() {
-    $.ajax({
-      url: this.props.url,
-      dataType: 'json',
-      cache: false,
-      success: function(data) {
-        this.setState({data: data});
-      }.bind(this),
-      error: function(xhr, status, err) {
-        console.error(this.props.url, status, err.toString());
-      }.bind(this)
-    });
-  },
-  handleCommentSubmit: function(comment) {
-    var comments = this.state.data;
-    comments.push(comment);
-    this.setState({data: comments}, function() {
-      // `setState` accepts a callback. To avoid (improbable) race condition,
-      // `we'll send the ajax request right after we optimistically set the new
-      // `state.
-      $.ajax({
-        url: this.props.url,
-        dataType: 'json',
-        type: 'POST',
-        data: comment,
-        success: function(data) {
-          this.setState({data: data});
-        }.bind(this),
-        error: function(xhr, status, err) {
-          console.error(this.props.url, status, err.toString());
-        }.bind(this)
-      });
-    });
-  },
-  getInitialState: function() {
-    return {data: []};
-  },
-  componentDidMount: function() {
-    this.loadCommentsFromServer();
-    setInterval(this.loadCommentsFromServer, this.props.pollInterval);
-  },
+var RestBox = React.createClass({
+
   render: function() {
     return (
       <div className="commentBox">
         <RestRequestHeaderBox />
-        <h1>Comments</h1>
-        <CommentList data={this.state.data} />
-        <CommentForm onCommentSubmit={this.handleCommentSubmit} />
+        <RestParameterListBox />
+        <RestRequestResultBox />
       </div>
     );
   }
 });
 
-var CommentList = React.createClass({
-  render: function() {
-    var commentNodes = this.props.data.map(function(comment, index) {
-      return (
-        // `key` is a React-specific concept and is not mandatory for the
-        // purpose of this tutorial. if you're curious, see more here:
-        // http://facebook.github.io/react/docs/multiple-components.html#dynamic-children
-        <Comment author={comment.author} key={index}>
-          {comment.text}
-        </Comment>
-      );
-    });
-    return (
-      <div className="commentList">
-        {commentNodes}
-      </div>
-    );
-  }
-});
+var render = function () {
+  React.render(
+    <RestBox />,
+    document.getElementById('content')
+  );
+};
 
-var CommentForm = React.createClass({
-  handleSubmit: function(e) {
-    e.preventDefault();
-    var author = React.findDOMNode(this.refs.author).value.trim();
-    var text = React.findDOMNode(this.refs.text).value.trim();
-    if (!text || !author) {
-      return;
-    }
-    this.props.onCommentSubmit({author: author, text: text});
-    React.findDOMNode(this.refs.author).value = '';
-    React.findDOMNode(this.refs.text).value = '';
-  },
-  render: function() {
-    return (
-      <form className="commentForm" onSubmit={this.handleSubmit}>
-        <input type="text" placeholder="Your name" ref="author" />
-        <input type="text" placeholder="Say something..." ref="text" />
-        <input type="submit" value="Post" />
-      </form>
-    );
-  }
-});
-
-React.render(
-  <CommentBox url="comments.json" pollInterval={2000} />,
-  document.getElementById('content')
-);
+render();
